@@ -272,8 +272,110 @@ describe('followEvents', () => {
       onEvent: () => undefined,
     });
 
-    expect(fetchEvents).toHaveBeenCalledTimes(1);
+    // One poll, then one final read after the call is seen to have ended.
+    expect(fetchEvents).toHaveBeenCalledTimes(2);
     expect(clock.elapsed()).toBe(0);
+  });
+
+  it('prints the events that land as the call ends', async () => {
+    const clock = fakeClock();
+    const polls: CallEvent[][] = [
+      [{ id: 'e1', event_type: 'call.started', occurred_at: '2026-09-03T10:00:00Z' }],
+      [
+        { id: 'e1', event_type: 'call.started', occurred_at: '2026-09-03T10:00:00Z' },
+        {
+          id: 'e2',
+          event_type: 'call.failed',
+          occurred_at: '2026-09-03T10:00:03Z',
+          failure_cause: 'busy',
+        },
+      ],
+    ];
+    let poll = 0;
+    const printed: string[] = [];
+
+    const result = await followEvents('s', {
+      now: clock.now,
+      wait: clock.wait,
+      fetchEvents: async () => ({
+        events: polls[Math.min(poll++, polls.length - 1)] as CallEvent[],
+      }),
+      fetchCall: async () => ({ id: 's', status: 'failed' }),
+      onEvent: (event) => printed.push(event.event_type),
+    });
+
+    expect(printed).toEqual(['call.started', 'call.failed']);
+    expect(result).toEqual({ timedOut: false });
+  });
+
+  it('reports a timeout instead of returning as if the call ended', async () => {
+    const clock = fakeClock();
+
+    const result = await followEvents('s', {
+      now: clock.now,
+      wait: clock.wait,
+      timeoutMs: 10_000,
+      intervalMs: 2_000,
+      fetchEvents: async () => ({ events: [] }),
+      fetchCall: async () => ({ id: 's', status: 'active' }),
+      onEvent: () => undefined,
+    });
+
+    expect(result).toEqual({ timedOut: true });
+  });
+
+  it('checks the status once more after the deadline', async () => {
+    // The deadline passes during a pause, so a call that ends in that window
+    // used to be reported as still running and the events that closed it were
+    // never printed.
+    const clock = fakeClock();
+    const printed: string[] = [];
+    let statusPolls = 0;
+
+    const result = await followEvents('s', {
+      now: clock.now,
+      wait: clock.wait,
+      timeoutMs: 4_000,
+      intervalMs: 2_000,
+      fetchEvents: async () => ({
+        events:
+          statusPolls < 2
+            ? [{ id: 'e1', event_type: 'call.started', occurred_at: '' }]
+            : [
+                { id: 'e1', event_type: 'call.started', occurred_at: '' },
+                { id: 'e2', event_type: 'call.completed', occurred_at: '' },
+              ],
+      }),
+      fetchCall: async () => {
+        statusPolls += 1;
+        return { id: 's', status: statusPolls < 3 ? 'active' : 'completed' };
+      },
+      onEvent: (event) => printed.push(event.event_type),
+    });
+
+    expect(result).toEqual({ timedOut: false });
+    expect(printed).toEqual(['call.started', 'call.completed']);
+  });
+
+  it('still times out when the last check says the call is running', async () => {
+    const clock = fakeClock();
+    const printed: string[] = [];
+
+    const result = await followEvents('s', {
+      now: clock.now,
+      wait: clock.wait,
+      timeoutMs: 4_000,
+      intervalMs: 2_000,
+      fetchEvents: async () => ({
+        events: [{ id: 'e1', event_type: 'call.started', occurred_at: '' }],
+      }),
+      fetchCall: async () => ({ id: 's', status: 'active' }),
+      onEvent: (event) => printed.push(event.event_type),
+    });
+
+    expect(result).toEqual({ timedOut: true });
+    // Printed once: a re-fetch must not reprint an event already seen.
+    expect(printed).toEqual(['call.started']);
   });
 });
 
