@@ -38,3 +38,19 @@ export const EXIT = {
 } as const;
 
 export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
+
+/**
+ * The command line itself was wrong — {@link EXIT.usage}, not {@link EXIT.runtime}.
+ *
+ * A malformed flag used to surface as a plain `Error`, which the top-level
+ * handler maps to the runtime code. A script then could not tell "you invoked
+ * me wrongly" from "the network was down" — the same collapse `eval run` avoids
+ * by exiting 6. Carrying the distinction in the type keeps the decision next to
+ * the throw rather than at the catch, which cannot recover it.
+ */
+export class UsageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UsageError';
+  }
+}

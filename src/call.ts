@@ -1,4 +1,5 @@
 import { apiFetch } from './api-client.js';
+import { UsageError } from './constants.js';
 
 /**
  * `speko-cli call` and `speko-cli logs` — the loop a developer or an agent actually
@@ -108,7 +109,46 @@ export interface CallFlags {
   readonly agent?: string;
   readonly prompt?: string;
   readonly 'first-message'?: string;
+  readonly intent?: string;
   readonly data?: string;
+}
+
+/**
+ * `--intent` is a JSON object, not a bare language tag.
+ *
+ * It was advertised in `--help` and then silently dropped by the body builder,
+ * so the API answered "Either `agentId` or `intent` is required" to a caller
+ * who had just supplied one. Parsing it here is the fix; the explicit error is
+ * the other half, because the failure it replaces pointed at the wrong field
+ * entirely and sent the reader looking for a missing flag rather than a
+ * malformed one.
+ */
+const INTENT_SHAPE = '--intent must be a JSON object, e.g. --intent \'{"language":"en-US"}\'.';
+const DATA_SHAPE = '--data must be a JSON object.';
+
+/**
+ * Both JSON-valued flags parse through here, deliberately.
+ *
+ * They were handled separately and drifted: `--data` called `JSON.parse` bare,
+ * so `--data '{oops'` threw a SyntaxError past the object check and exited 1
+ * rather than 2, while a syntactically valid `--data '[1,2]'` exited 2. Same
+ * flag, two exit codes, decided by which half of the validation caught it. One
+ * function means a new JSON flag cannot reintroduce that.
+ *
+ * The value is never interpolated into the message: it can carry a system
+ * prompt or a customer number, and stderr ends up in captured CI logs.
+ */
+function parseJsonObjectFlag(raw: string, shape: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new UsageError(shape);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new UsageError(shape);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 /**
@@ -121,18 +161,13 @@ export interface CallFlags {
  */
 export function buildCallBody(flags: Record<string, string>): Record<string, unknown> {
   const base: Record<string, unknown> = {};
-  if (flags['data']) {
-    const parsed: unknown = JSON.parse(flags['data']);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('--data must be a JSON object.');
-    }
-    Object.assign(base, parsed);
-  }
+  if (flags['data']) Object.assign(base, parseJsonObjectFlag(flags['data'], DATA_SHAPE));
   if (flags['to']) base['to'] = flags['to'];
   if (flags['from']) base['from'] = flags['from'];
   if (flags['agent']) base['agentId'] = flags['agent'];
   if (flags['prompt']) base['systemPrompt'] = flags['prompt'];
   if (flags['first-message']) base['firstMessage'] = flags['first-message'];
+  if (flags['intent']) base['intent'] = parseJsonObjectFlag(flags['intent'], INTENT_SHAPE);
   return base;
 }
 

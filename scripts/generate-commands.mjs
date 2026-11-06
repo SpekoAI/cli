@@ -216,8 +216,10 @@ function collect(spec) {
           const declared = parameters.find((p) => p.in === 'path' && p.name === name);
           return { name, description: declared?.description ?? '' };
         }),
+        // A deepObject parameter (`metadata[key]=value`) has no single flag
+        // value the runner could send, so it stays API-only.
         queryParams: parameters
-          .filter((p) => p.in === 'query')
+          .filter((p) => p.in === 'query' && p.style !== 'deepObject')
           .map((p) => ({
             name: p.name,
             required: Boolean(p.required),

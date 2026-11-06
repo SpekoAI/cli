@@ -10,6 +10,7 @@ import {
   transcriptTurns,
   waitForCall,
 } from './call.js';
+import { UsageError } from './constants.js';
 
 function fakeClock() {
   let current = 0;
@@ -50,6 +51,68 @@ describe('buildCallBody', () => {
 
   it('rejects a --data payload that is not an object', () => {
     expect(() => buildCallBody({ data: '[1,2]' })).toThrow(/JSON object/);
+  });
+
+  it('maps --intent, which used to be parsed and silently dropped', () => {
+    // The flag was in `--help` but never reached the body, so the API replied
+    // "Either `agentId` or `intent` is required" to a caller who passed one.
+    expect(buildCallBody({ to: '+15551234567', intent: '{"language":"en-US"}' })).toEqual({
+      to: '+15551234567',
+      intent: { language: 'en-US' },
+    });
+  });
+
+  it('names the flag when --intent is not JSON', () => {
+    // A bare language tag is the likely mistake; the message has to show the
+    // shape rather than let JSON.parse surface "Unexpected token".
+    expect(() => buildCallBody({ to: '+1555', intent: 'en-US' })).toThrow(
+      /--intent must be a JSON object/,
+    );
+  });
+
+  it('classifies a malformed --intent as a usage error, not a runtime one', () => {
+    // A plain Error exits 1, which a script cannot tell from "the network was
+    // down". The command line was wrong, so it has to exit 2.
+    expect(() => buildCallBody({ to: '+1555', intent: '{oops' })).toThrow(UsageError);
+    expect(() => buildCallBody({ to: '+1555', intent: '["en"]' })).toThrow(UsageError);
+  });
+
+  // Both JSON flags, both ways of being wrong. The first version of this test
+  // only covered a valid-JSON non-object, so it passed while `--data '{oops'`
+  // still threw a bare SyntaxError and exited 1.
+  it.each([
+    ['--data', 'unparseable', { data: '{oops' }],
+    ['--data', 'valid JSON, not an object', { data: '[1,2]' }],
+    ['--intent', 'unparseable', { to: '+1555', intent: '{oops' }],
+    ['--intent', 'valid JSON, not an object', { to: '+1555', intent: '["en"]' }],
+  ])('%s that is %s is a usage error', (_flag, _why, flags) => {
+    expect(() => buildCallBody(flags as Record<string, string>)).toThrow(UsageError);
+  });
+
+  it('never echoes the supplied --intent back into the message', () => {
+    // It can carry a prompt or a customer number, and stderr ends up in CI logs.
+    const secret = '{"language":"en","note":"call +15551234567 about invoice 9912"}x';
+    try {
+      buildCallBody({ to: '+1555', intent: secret });
+      throw new Error('expected buildCallBody to reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UsageError);
+      expect((error as Error).message).not.toContain('15551234567');
+      expect((error as Error).message).not.toContain('9912');
+    }
+  });
+
+  it('rejects an --intent array', () => {
+    expect(() => buildCallBody({ to: '+1555', intent: '["en"]' })).toThrow(
+      /--intent must be a JSON object/,
+    );
+  });
+
+  it('lets --intent ride alongside --data', () => {
+    expect(buildCallBody({ data: '{"to":"+1999"}', intent: '{"language":"es-MX"}' })).toEqual({
+      to: '+1999',
+      intent: { language: 'es-MX' },
+    });
   });
 });
 

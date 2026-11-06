@@ -14,7 +14,7 @@ import {
   transcriptTurns,
   waitForCall,
 } from './call.js';
-import { API_URL, EXIT, type ExitCode } from './constants.js';
+import { API_URL, EXIT, type ExitCode, UsageError } from './constants.js';
 import {
   clearCredentials,
   clearPending,
@@ -63,7 +63,7 @@ Usage
   speko-cli auth revoke <id>  Sign out one device (--all for every device)
   speko-cli init              Add Speko guidance for coding agents to this repo
   speko-cli call --to <n>     Place a call, wait for it, print the transcript
-                              (--agent <id> or --intent; --no-wait to return at once)
+                              (--agent <id> or --intent <json>; --no-wait to return at once)
   speko-cli logs <id>         Call events (--follow to stream)
   speko-cli explain <CODE>    What an error code means, and whether to retry it
   speko-cli doctor            Why calls are failing: credit, providers, scopes
@@ -871,6 +871,11 @@ async function main(): Promise<void> {
       console.error(error.message);
       if (error.hint) console.error(error.hint);
       process.exitCode = EXIT.auth;
+      return;
+    }
+    if (error instanceof UsageError) {
+      console.error(error.message);
+      process.exitCode = EXIT.usage;
       return;
     }
     console.error(error instanceof Error ? error.message : String(error));

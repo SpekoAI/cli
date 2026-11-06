@@ -83,13 +83,14 @@ export const BUILTIN_HELP: Readonly<Record<string, BuiltinHelp>> = {
     ],
   },
   call: {
-    usage: 'speko-cli call --to <e164> [--agent <id>] [--no-wait]',
+    usage: 'speko-cli call --to <e164> [--agent <id> | --intent <json>] [--no-wait]',
     lines: [
       'Place a call, wait for it, and print the transcript.',
       '',
       '  --to <e164>        Required. The number to call, e.g. +15551234567.',
-      '  --agent <id>       The agent to run. Required unless --data carries an',
-      '                     `intent` instead.',
+      '  --agent <id>       The agent to run. Required unless --intent is given.',
+      '  --intent <json>    Route without a stored agent, e.g.',
+      '                     --intent \'{"language":"en-US","optimizeFor":"latency"}\'.',
       '  --from <e164>      Caller id. Defaults to a number on the workspace.',
       '  --prompt <text>    Override the system prompt for this call only.',
       '  --first-message    What the agent says first.',

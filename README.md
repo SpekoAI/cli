@@ -66,6 +66,7 @@ where one has been written. `retryable` is the field to branch on.
 ```bash
 speko-cli eval generate --agent <id>            # propose a suite; prints it, saves nothing
 speko-cli eval generate --agent <id> --persist  # keep it
+speko-cli eval list --agent <id>                # the stored suite, one line per case
 speko-cli eval run --agent <id>                 # run it, report what broke
 speko-cli eval trends --agent <id>              # pass rate over time
 ```
