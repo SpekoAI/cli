@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5
 
 - `speko-cli top-up` prints a one-tap payment link for the signed-in
   workspace. It opens a Stripe page where you pick the amount, from $5.
