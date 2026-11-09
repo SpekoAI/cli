@@ -20,6 +20,7 @@ npx @spekoai/cli login
 | `speko-cli call --to <e164>` | Places a call, waits for it, prints the transcript |
 | `speko-cli logs <session_id>` | Call events, `--follow` to stream |
 | `speko-cli doctor` | Why calls are failing: credit, providers, scopes, last failure |
+| `speko-cli top-up` | Prints a one-tap payment link that adds credit; you pick the amount on Stripe |
 | `speko-cli explain <CODE>` | What an error code means, and whether retrying helps |
 | `speko-cli bench [stage]` | Measured provider scores — the numbers routing decides on |
 | `speko-cli eval` | Generate a test suite for an agent, run it, report regressions |

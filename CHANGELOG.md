@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- `speko-cli top-up` prints a one-tap payment link for the signed-in
+  workspace. It opens a Stripe page where you pick the amount, from $5.
+  Creating the link charges nothing, so it works from a CLI session without
+  the billing scope.
+- A refusal that a top-up clears (HTTP 402) now prints the payment link after
+  the error, as `Top up: <url>`. The CLI used to drop the `topUpUrl` and
+  `billingUrl` the server sends. Exit code 5 is unchanged.
+- `doctor` names `speko-cli top-up` when the workspace has no credit.
+
 ## 0.1.3
 
 - Point the README and the skill file `init` writes at `docs.speko.ai/cli`. The

@@ -23,6 +23,7 @@ const HAND_WRITTEN = [
   'bench',
   'eval',
   'mcp',
+  'top-up',
 ] as const;
 
 describe('builtin help', () => {

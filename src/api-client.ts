@@ -1,4 +1,4 @@
-import { API_URL } from './constants.js';
+import { API_URL, DASHBOARD_URL } from './constants.js';
 import { readCredentials, userAgent } from './credentials.js';
 import { CLI_VERSION } from './version.js';
 
@@ -22,6 +22,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly hint?: string,
+    /** Where to pay, for a refusal that a top-up clears. */
+    readonly link?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -40,15 +42,42 @@ interface ErrorBody {
   readonly message?: string;
   readonly hint?: string;
   readonly code?: string;
+  readonly topUpUrl?: unknown;
+  readonly billingUrl?: unknown;
 }
 
-function messageFrom(body: unknown, status: number): { message: string; hint?: string } {
+/**
+ * The payment link a refusal carries. The one-tap `topUpUrl` comes first: it
+ * opens Stripe with no sign-in. `billingUrl` is a console path and needs one.
+ * Only an https link, or a path on the console, is ever printed.
+ */
+export function paymentLinkFrom(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const { topUpUrl, billingUrl } = body as ErrorBody;
+  if (typeof topUpUrl === 'string' && topUpUrl.startsWith('https://')) return topUpUrl;
+  if (typeof billingUrl === 'string') {
+    if (billingUrl.startsWith('https://')) return billingUrl;
+    if (billingUrl.startsWith('/') && !billingUrl.startsWith('//')) {
+      return `${DASHBOARD_URL}${billingUrl}`;
+    }
+  }
+  return undefined;
+}
+
+interface ErrorMessage {
+  readonly message: string;
+  readonly hint?: string;
+  readonly link?: string;
+}
+
+function messageFrom(body: unknown, status: number): ErrorMessage {
+  const link = status === 402 ? paymentLinkFrom(body) : undefined;
   if (body && typeof body === 'object') {
     const { error, message, hint } = body as ErrorBody;
     const text = typeof error === 'string' ? error : typeof message === 'string' ? message : null;
-    if (text) return hint ? { message: text, hint } : { message: text };
+    if (text) return { message: text, ...(hint ? { hint } : {}), ...(link ? { link } : {}) };
   }
-  return { message: `Request failed (HTTP ${status}).` };
+  return { message: `Request failed (HTTP ${status}).`, ...(link ? { link } : {}) };
 }
 
 /** True when the server said this body is JSON. */
@@ -109,8 +138,8 @@ export async function apiRequest(
     } catch {
       body = null;
     }
-    const { message, hint } = messageFrom(body, response.status);
-    throw new ApiError(response.status, message, hint);
+    const { message, hint, link } = messageFrom(body, response.status);
+    throw new ApiError(response.status, message, hint, link);
   }
 
   return response;

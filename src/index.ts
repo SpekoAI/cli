@@ -49,6 +49,7 @@ import { COMMAND_GROUPS } from './generated/commands.js';
 import { runInit } from './init.js';
 import { formatMcp, probeMcp } from './mcp.js';
 import { findCommand, groupHelp, parseFlags, runGeneratedCommand } from './run-command.js';
+import { createTopUpLink, formatTopUpLink } from './top-up.js';
 
 export { EXIT } from './constants.js';
 export { CLI_CLIENT_ID, CLI_SCOPE } from './device-login.js';
@@ -67,6 +68,7 @@ Usage
   speko-cli logs <id>         Call events (--follow to stream)
   speko-cli explain <CODE>    What an error code means, and whether to retry it
   speko-cli doctor            Why calls are failing: credit, providers, scopes
+  speko-cli top-up            A payment link that adds credit (you pick the amount)
   speko-cli bench <stage>     Measured provider scores: stt, llm, tts, s2s
   speko-cli eval run          Prove a prompt change did not break the agent
   speko-cli mcp               Point an MCP client at Speko (no API key needed)
@@ -81,7 +83,7 @@ Options
   --json                  Machine-readable output. The generated API commands
                           above already emit JSON, so it changes nothing there;
                           it is the flag that turns login, whoami, auth, init,
-                          logs, explain and doctor from tables into JSON.
+                          logs, explain, doctor and top-up from tables into JSON.
   -h, --help              Show this help
   -v, --version           Show the CLI version
 
@@ -476,6 +478,15 @@ async function mcp(out: Output): Promise<ExitCode> {
   return EXIT.ok;
 }
 
+async function topUp(out: Output): Promise<ExitCode> {
+  const link = await createTopUpLink();
+  out.text('');
+  for (const line of formatTopUpLink(link)) out.text(line);
+  out.text('');
+  out.json(link);
+  return EXIT.ok;
+}
+
 async function doctor(out: Output): Promise<ExitCode> {
   const diagnostics = await fetchDiagnostics();
   // Two extra reads, so the report can say whether the agents that exist can
@@ -807,6 +818,8 @@ export async function run(argv: readonly string[]): Promise<ExitCode> {
       return await evalCommand(out, args);
     case 'mcp':
       return await mcp(out);
+    case 'top-up':
+      return await topUp(out);
     default: {
       // Anything not hand-written is looked up in the generated table, so a new
       // API endpoint becomes available by regenerating rather than by editing
@@ -864,6 +877,7 @@ async function main(): Promise<void> {
     if (error instanceof ApiError) {
       console.error(error.message);
       if (error.hint) console.error(error.hint);
+      if (error.link) console.error(`Top up: ${error.link}`);
       process.exitCode = exitCodeForStatus(error.status);
       return;
     }

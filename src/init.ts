@@ -114,6 +114,7 @@ missing cost as free.
 \`\`\`bash
 speko-cli doctor                            # credit, provider reachability, scopes, last failure
 speko-cli explain INSUFFICIENT_CREDITS      # what a code means, and whether to retry
+speko-cli top-up                            # a payment link that adds credit; you pick the amount
 \`\`\`
 
 Run \`doctor\` before debugging a failing call — it exits non-zero only when

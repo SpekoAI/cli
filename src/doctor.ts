@@ -209,7 +209,7 @@ export function buildChecks(
       label: 'Credit',
       detail: d.credit.sufficient
         ? `$${d.credit.available_usd.toFixed(2)} available`
-        : 'No credit remaining — calls will fail until the workspace is topped up.',
+        : 'No credit remaining — calls will fail until the workspace is topped up. Run `speko-cli top-up` for a payment link.',
     });
   } else {
     checks.push({ state: 'info', label: 'Credit', detail: d.credit.note });

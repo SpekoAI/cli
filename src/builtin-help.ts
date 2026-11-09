@@ -197,6 +197,22 @@ export const BUILTIN_HELP: Readonly<Record<string, BuiltinHelp>> = {
       '  --json   The probe result as JSON.',
     ],
   },
+  'top-up': {
+    usage: 'speko-cli top-up',
+    lines: [
+      'A payment link that adds credit to this workspace.',
+      '',
+      '  Prints a one-tap link to a secure Stripe page where you choose the',
+      '  amount, from $5. Creating the link charges nothing, and the link can',
+      '  only pay into this workspace, so it works from a CLI session without',
+      '  the billing scope. It stays valid for 7 days.',
+      '',
+      '  A refused call or request that a top-up clears prints the same kind of',
+      '  link after the error, as `Top up: <url>`.',
+      '',
+      '  --json   The link, its purpose and expiry as JSON.',
+    ],
+  },
   doctor: {
     usage: 'speko-cli doctor',
     lines: [
