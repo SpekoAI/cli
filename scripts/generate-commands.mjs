@@ -35,8 +35,11 @@ const OUT_PATH = join(here, '../src/generated/commands.ts');
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+/** Brand names kept as one word, so `WhatsApp` is `whatsapp`, not `whats-app`. */
+const BRAND_WORDS = [['WhatsApp', 'Whatsapp']];
+
 const kebab = (value) =>
-  value
+  BRAND_WORDS.reduce((text, [brand, word]) => text.replaceAll(brand, word), value)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .toLowerCase()
