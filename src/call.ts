@@ -282,8 +282,18 @@ export interface FollowOptions {
  * them. Seen ids are tracked so a re-fetch does not reprint the log, and the
  * loop stops once the call itself has ended — a follow that ran forever on a
  * finished call would look like a hang.
+ *
+ * Events are fetched once more after the call is seen to end, because the ones
+ * that explain how it ended (a `call.failed` with its cause) usually land
+ * between the last events poll and the status check. A timeout is reported
+ * rather than returned silently, so the caller can say the call is still live,
+ * and the status is checked one last time after the deadline so a call that
+ * ended during the final pause is not reported as still running.
  */
-export async function followEvents(id: string, options: FollowOptions): Promise<void> {
+export async function followEvents(
+  id: string,
+  options: FollowOptions,
+): Promise<{ timedOut: boolean }> {
   const intervalMs = options.intervalMs ?? 2_000;
   const timeoutMs = options.timeoutMs ?? 600_000;
   const now = options.now ?? Date.now;
@@ -294,16 +304,32 @@ export async function followEvents(id: string, options: FollowOptions): Promise<
   const seen = new Set<string>();
   const deadline = now() + timeoutMs;
 
-  while (now() < deadline) {
+  const drain = async (): Promise<void> => {
     const { events } = await fetchEvents(id);
     for (const event of events) {
       if (seen.has(event.id)) continue;
       seen.add(event.id);
       options.onEvent(event);
     }
+  };
 
+  /** Prints what is new, then says whether the call has ended. */
+  const settled = async (): Promise<boolean> => {
+    await drain();
     const call = await fetchCall(id);
-    if (isFinished(call)) return;
+    if (!isFinished(call)) return false;
+    await drain();
+    return true;
+  };
+
+  while (now() < deadline) {
+    if (await settled()) return { timedOut: false };
     await pause(intervalMs);
   }
+
+  // The deadline lands in the middle of a pause, so the call may well have
+  // ended while this was asleep. Ask once more before calling it a timeout:
+  // telling a caller a finished call is still running sends them back to
+  // follow something that has nothing left to say.
+  return { timedOut: !(await settled()) };
 }
