@@ -93,7 +93,7 @@ Exit codes
   2  usage error                6  an eval suite regressed
   3  not signed in
 
-Docs: https://speko.ai/developers/cli
+Docs: https://speko.com/developers/cli
 `;
 
 /**

@@ -145,7 +145,7 @@ markdown.
 }
 
 function envExampleBody(): string {
-  return `# Speko — https://speko.ai
+  return `# Speko — https://speko.com
 #
 # The CLI keeps its own credential in your config directory, so it does NOT
 # read this. This is for application code that calls the Speko API at runtime.
